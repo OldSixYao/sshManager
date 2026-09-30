@@ -35,25 +35,22 @@ struct APIKeyEditorSheet: View {
             Form {
                 Section("基本") {
                     LabeledField(label: "名称") {
-                        TextField("", text: $name)
+                        LeadingTextField(text: $name)
                     }
                     LabeledField(label: "BaseURL") {
-                        TextField("", text: $baseURL)
-                            .font(.system(.body, design: .monospaced))
+                        LeadingTextField(text: $baseURL, monospaced: true)
                     }
                     LabeledField(label: "网站", hint: "服务商控制台，可选") {
-                        TextField("", text: $website)
+                        LeadingTextField(text: $website)
                     }
                 }
                 Section("密钥") {
                     LabeledField(label: "API Key") {
                         HStack {
                             if showKey {
-                                TextField("", text: $apiKey)
-                                    .font(.system(.body, design: .monospaced))
+                                LeadingTextField(text: $apiKey, monospaced: true)
                             } else {
-                                SecureField("", text: $apiKey)
-                                    .font(.system(.body, design: .monospaced))
+                                LeadingSecureField(text: $apiKey, monospaced: true)
                             }
                             Button {
                                 showKey.toggle()
@@ -67,8 +64,7 @@ struct APIKeyEditorSheet: View {
                 Section("模型") {
                     ForEach(models.indices, id: \.self) { index in
                         HStack {
-                            TextField("", text: $models[index])
-                                .font(.system(.body, design: .monospaced))
+                            LeadingTextField(text: $models[index], monospaced: true)
                             Button {
                                 _ = models.remove(at: index)
                             } label: {

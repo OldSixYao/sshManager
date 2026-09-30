@@ -23,3 +23,29 @@ struct LabeledField<Content: View>: View {
         .padding(.vertical, 2)
     }
 }
+
+/// 表单内左对齐的文本输入：macOS 分组表单会把 TextField 内容居中，这里显式强制靠左。
+struct LeadingTextField: View {
+    var placeholder: String = ""
+    @Binding var text: String
+    var monospaced = false
+
+    var body: some View {
+        TextField(placeholder, text: $text)
+            .multilineTextAlignment(.leading)
+            .font(monospaced ? .system(.body, design: .monospaced) : .body)
+    }
+}
+
+/// 左对齐的密码输入（显示为圆点）。
+struct LeadingSecureField: View {
+    var placeholder: String = ""
+    @Binding var text: String
+    var monospaced = false
+
+    var body: some View {
+        SecureField(placeholder, text: $text)
+            .multilineTextAlignment(.leading)
+            .font(monospaced ? .system(.body, design: .monospaced) : .body)
+    }
+}

@@ -25,20 +25,20 @@ struct HostEditorSheet: View {
             Form {
                 Section("基本") {
                     LabeledField(label: "别名", hint: "空格分隔可设多个") {
-                        TextField("", text: $aliasesText)
+                        LeadingTextField(text: $aliasesText)
                     }
                     LabeledField(label: "主机名") {
-                        TextField("", text: $draft.hostName)
+                        LeadingTextField(text: $draft.hostName)
                     }
                     LabeledField(label: "用户", hint: "可选") {
-                        TextField("", text: $draft.user)
+                        LeadingTextField(text: $draft.user)
                     }
                     LabeledField(label: "端口", hint: "可选，默认 22") {
-                        TextField("", text: $draft.port)
+                        LeadingTextField(text: $draft.port)
                     }
                     LabeledField(label: "分组", hint: "可选") {
                         HStack {
-                            TextField("", text: $groupText)
+                            LeadingTextField(text: $groupText)
                             if !model.groups.isEmpty {
                                 Menu {
                                     ForEach(model.groups, id: \.self) { group in
@@ -76,16 +76,15 @@ struct HostEditorSheet: View {
                     }
                     Toggle("仅使用上面的密钥（IdentitiesOnly）", isOn: $draft.identitiesOnly)
                     LabeledField(label: "保活间隔（秒）", hint: "可选") {
-                        TextField("", text: $draft.serverAliveInterval)
+                        LeadingTextField(text: $draft.serverAliveInterval)
                     }
                 }
                 Section("跳板 / 代理") {
                     LabeledField(label: "ProxyJump", hint: "可选") {
-                        TextField("", text: $draft.proxyJump)
+                        LeadingTextField(text: $draft.proxyJump)
                     }
                     LabeledField(label: "ProxyCommand", hint: "可选") {
-                        TextField("", text: $draft.proxyCommand)
-                            .font(.system(.body, design: .monospaced))
+                        LeadingTextField(text: $draft.proxyCommand, monospaced: true)
                     }
                 }
                 forwardSection(title: "本地转发", forwards: $draft.localForwards, isRemote: false)
@@ -93,11 +92,9 @@ struct HostEditorSheet: View {
                 Section("其他选项（原样写回 config）") {
                     ForEach($draft.otherOptions) { $option in
                         HStack {
-                            TextField("键", text: $option.key)
+                            LeadingTextField(placeholder: "键", text: $option.key, monospaced: true)
                                 .frame(width: 160)
-                                .font(.system(.body, design: .monospaced))
-                            TextField("值", text: $option.value)
-                                .font(.system(.body, design: .monospaced))
+                            LeadingTextField(placeholder: "值", text: $option.value, monospaced: true)
                             Button {
                                 draft.otherOptions.removeAll { $0.id == option.id }
                             } label: {
@@ -144,8 +141,7 @@ struct HostEditorSheet: View {
         Section(title) {
             ForEach(forwards) { $forward in
                 HStack {
-                    TextField("", text: $forward.raw)
-                        .font(.system(.body, design: .monospaced))
+                    LeadingTextField(text: $forward.raw, monospaced: true)
                     Button {
                         forwards.wrappedValue.removeAll { $0.id == forward.id }
                     } label: {
