@@ -24,7 +24,28 @@ struct LabeledField<Content: View>: View {
     }
 }
 
-/// 表单内左对齐的文本输入：macOS 分组表单会把 TextField 内容居中，这里显式强制靠左。
+/// 自绘分区卡片：替代 Form(.formStyle(.grouped))。
+/// macOS 26 分组表单会把 TextField 的光标/内容渲染到行右侧，Form 内无法修复，
+/// 因此表单改为 ScrollView + 本组件的完全自绘布局。
+struct FormSectionCard<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+            VStack(alignment: .leading, spacing: 12) {
+                content
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
+        }
+    }
+}
+
+/// 左对齐的文本输入：显式双保险（对齐修饰 + plain 样式），杜绝表单容器的居中/靠右渲染。
 struct LeadingTextField: View {
     var placeholder: String = ""
     @Binding var text: String
@@ -32,8 +53,19 @@ struct LeadingTextField: View {
 
     var body: some View {
         TextField(placeholder, text: $text)
+            .textFieldStyle(.plain)
             .multilineTextAlignment(.leading)
             .font(monospaced ? .system(.body, design: .monospaced) : .body)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.primary.opacity(0.045))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .strokeBorder(Color.secondary.opacity(0.25), lineWidth: 1)
+                    )
+            )
     }
 }
 
@@ -45,7 +77,18 @@ struct LeadingSecureField: View {
 
     var body: some View {
         SecureField(placeholder, text: $text)
+            .textFieldStyle(.plain)
             .multilineTextAlignment(.leading)
             .font(monospaced ? .system(.body, design: .monospaced) : .body)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.primary.opacity(0.045))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .strokeBorder(Color.secondary.opacity(0.25), lineWidth: 1)
+                    )
+            )
     }
 }
