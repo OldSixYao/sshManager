@@ -1,6 +1,6 @@
 # SSH Manager
 
-一个原生 SwiftUI 的 macOS 小工具，用于管理本机 `~/.ssh/config`：主机增删改查、分组搜索、一键调起终端连接、端口转发管理、密钥与指纹查看。
+一个原生 SwiftUI 的 macOS 小工具，用于管理本机 `~/.ssh/config` 与 API 密钥：主机增删改查、分组搜索、一键调起终端连接、端口转发管理、密钥与指纹查看，以及 LLM API Key（BaseURL / 密钥 / 模型 / 官网）的管理与连通性测试。
 
 不引入自有配置格式、不碰密钥内容、不常驻后台——`~/.ssh/config` 始终是唯一事实来源，命令行 `ssh` 和其他工具照常工作。
 
@@ -29,6 +29,7 @@
 | 分组与搜索 | 分组存放在独立元数据文件中，不污染 ssh config；按名称 / 主机名 / 用户 / 标签搜索 |
 | 端口转发 | 管理 LocalForward / RemoteForward，一键后台启停 `ssh -N -L/-R` 进程，显示运行状态与错误输出 |
 | 密钥与指纹 | 扫描 `~/.ssh` 密钥并展示指纹；浏览 known_hosts、查询主机指纹、一键哈希化 known_hosts |
+| API 密钥管理 | 管理 LLM API Key（名称 / BaseURL / 密钥 / 官网 / 多模型），一键复制（密钥默认打码）、连通性测试、复制 curl 示例、打开官网 |
 | 生效配置 | 详情页查看 `ssh -G <alias>` 输出的最终生效配置（含全局默认值合并结果） |
 | 自动刷新 | 外部（编辑器 / 命令行）修改 `~/.ssh/config` 后自动重新加载 |
 | 自动备份 | 每次写盘前自动备份原文件，保留最近 10 份 |
@@ -118,7 +119,22 @@ open dist/SSHManager.app        # 或直接双击
 | `~/.ssh/config` | 唯一的主机配置事实来源（应用直接读写） |
 | `~/.ssh/config.sshm-backup-<时间戳>` | 每次写盘前的自动备份，保留最近 10 份 |
 | `~/Library/Application Support/SSHManager/metadata.json` | 分组 / 标签元数据（按主别名存储） |
+| `~/Library/Application Support/SSHManager/apikeys.json` | API 密钥库（600 权限，原子写入） |
 | `~/.ssh/known_hosts` / `known_hosts.old` | 主机指纹库及其哈希化备份 |
+
+---
+
+## 使用说明：API 密钥
+
+管理 LLM API Key（OpenAI 兼容约定为主）。侧栏 → `API 密钥` → `全部密钥`。
+
+- **新增 / 编辑 / 删除**：列表右上角 `+` 或详情页 `编辑…`；字段为名称、BaseURL、网站（可选）、API Key（可切换明文/掩码）、模型列表（可多个）
+- **搜索**：按名称 / 域名 / 模型实时过滤
+- **一键复制**：详情页 BaseURL、API Key、每个模型旁都有复制按钮；API Key 默认显示为 `sk-a…wxyz` 打码形式，点眼睛图标显示明文
+- **连通性测试**：详情页 `连通性测试` 按钮请求 `{BaseURL}` 的模型列表接口（`/v数字` 结尾的路径接 `/models`，否则拼 `/v1/models`），结果显示有效性、延迟与原因（401/403 密钥无效、429 有效但限流、404 端点不对等）
+- **复制 curl 示例**：生成可直接回车的 `curl -s <models-url> -H "Authorization: Bearer <key>"`（含真实密钥，便于终端调试）
+- **打开官网**：一键跳转服务商控制台
+- **存储**：`~/Library/Application Support/SSHManager/apikeys.json`，权限 600、原子写入；连通性测试只会访问你自己填写的 BaseURL
 
 ---
 
@@ -201,12 +217,16 @@ sshManager/
 └── Sources/SSHManager/
     ├── SSHManagerApp.swift       # @main 入口、菜单命令（⌘N）、Settings 场景
     ├── Models/
-    │   └── SSHHost.swift         # SSHHost / PortForward / RawOption / HostMetadata
+    │   ├── SSHHost.swift         # SSHHost / PortForward / RawOption / HostMetadata
+    │   └── APIKey.swift          # APIKey（名称 / BaseURL / 密钥 / 官网 / 多模型）
     ├── Services/
     │   ├── ConfigParser.swift    # OpenSSH config 解析 → 块 + 行区间
     │   ├── ConfigWriter.swift    # 块级文本手术（替换 / 追加 / 删除）+ 校验
     │   ├── ConfigStore.swift     # 原子写（tmp+rename，600 权限）+ 时间戳备份
     │   ├── AppModel.swift        # 应用状态：主机列表、分组元数据、增删改
+    │   ├── APIKeyStore.swift     # apikeys.json 原子读写（600 权限）
+    │   ├── APIKeysModel.swift    # API 密钥状态 + 自动持久化
+    │   ├── APIKeyTester.swift    # URL 规范化 / curl 生成 / 打码 / 连通性测试
     │   ├── TerminalLauncher.swift# osascript 调起 iTerm2 / Terminal
     │   ├── ForwardRunner.swift   # 端口转发进程生命周期管理
     │   ├── KeyInspector.swift    # ssh-keygen / ssh -G / known_hosts 封装
@@ -215,9 +235,11 @@ sshManager/
     │   ├── ContentView.swift     # NavigationSplitView + 侧栏
     │   ├── HostsPane.swift       # 主机列表（搜索 / 右键菜单）+ 详情切换
     │   ├── HostDetailView.swift  # 详情、连接、转发启停、生效配置
-    │   ├── HostEditorSheet.swift # 新增 / 编辑表单
+    │   ├── HostEditorSheet.swift # 主机新增 / 编辑表单
+    │   ├── APIKeysPane.swift     # API 密钥列表 + 详情（复制 / 测活 / 官网）
+    │   ├── APIKeyEditorSheet.swift # API 密钥新增 / 编辑表单
     │   ├── ForwardingView.swift  # 全部转发的管理页
-    │   ├── KeysView.swift        # 密钥指纹 + known_hosts
+    │   ├── KeysView.swift        # SSH 密钥指纹 + known_hosts
     │   └── SettingsView.swift    # 设置页
     └── Utils/
         ├── ShellTask.swift       # 子进程封装（超时 / 管道）

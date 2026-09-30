@@ -5,6 +5,7 @@ struct SSHManagerApp: App {
     @StateObject private var appModel = AppModel()
     @StateObject private var settings = SettingsStore()
     @StateObject private var runner = ForwardRunner()
+    @StateObject private var apiKeys = APIKeysModel()
 
     var body: some Scene {
         WindowGroup("SSH Manager") {
@@ -12,6 +13,7 @@ struct SSHManagerApp: App {
                 .environmentObject(appModel)
                 .environmentObject(settings)
                 .environmentObject(runner)
+                .environmentObject(apiKeys)
                 .frame(minWidth: 960, minHeight: 620)
         }
         .commands {

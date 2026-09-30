@@ -5,12 +5,14 @@ enum SidebarSelection: Hashable {
     case group(String)
     case forwarding
     case keys
+    case apiKeys
 }
 
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var runner: ForwardRunner
+    @EnvironmentObject private var apiKeys: APIKeysModel
     @State private var selection: SidebarSelection? = .allHosts
 
     var body: some View {
@@ -34,6 +36,8 @@ struct ContentView: View {
             ForwardingView()
         case .keys:
             KeysView()
+        case .apiKeys:
+            APIKeysPane()
         default:
             HostsPane(group: groupFilter)
         }
@@ -54,6 +58,7 @@ struct ContentView: View {
 
 struct SidebarView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var apiKeys: APIKeysModel
     @Binding var selection: SidebarSelection?
 
     var body: some View {
@@ -68,6 +73,11 @@ struct SidebarView: View {
                                title: group, systemImage: "folder",
                                badge: model.hosts(in: group).count)
                 }
+                sectionTitle("API 密钥")
+                    .padding(.top, 12)
+                SidebarRow(selection: $selection, value: .apiKeys,
+                           title: "全部密钥", systemImage: "key.horizontal",
+                           badge: apiKeys.keys.count)
                 sectionTitle("工具")
                     .padding(.top, 12)
                 SidebarRow(selection: $selection, value: .forwarding,
