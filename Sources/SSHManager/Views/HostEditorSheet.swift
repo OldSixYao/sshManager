@@ -23,12 +23,95 @@ struct HostEditorSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
-                basicSection
-                authSection
-                proxySection
-                forwardSection(title: "本地转发（如 8080:localhost:80）", forwards: $draft.localForwards, isRemote: false)
-                forwardSection(title: "远程转发（如 80:127.0.0.1:80）", forwards: $draft.remoteForwards, isRemote: true)
-                otherOptionsSection
+                Section("基本") {
+                    LabeledField(label: "别名", hint: "空格分隔可设多个") {
+                        TextField("", text: $aliasesText)
+                    }
+                    LabeledField(label: "主机名") {
+                        TextField("", text: $draft.hostName)
+                    }
+                    LabeledField(label: "用户", hint: "可选") {
+                        TextField("", text: $draft.user)
+                    }
+                    LabeledField(label: "端口", hint: "可选，默认 22") {
+                        TextField("", text: $draft.port)
+                    }
+                    LabeledField(label: "分组", hint: "可选") {
+                        HStack {
+                            TextField("", text: $groupText)
+                            if !model.groups.isEmpty {
+                                Menu {
+                                    ForEach(model.groups, id: \.self) { group in
+                                        Button(group) { groupText = group }
+                                    }
+                                } label: {
+                                    Image(systemName: "chevron.up.chevron.down")
+                                }
+                                .menuStyle(.borderlessButton)
+                                .fixedSize()
+                            }
+                        }
+                    }
+                }
+                Section("认证") {
+                    ForEach(draft.identityFiles.indices, id: \.self) { index in
+                        HStack {
+                            Text(draft.identityFiles[index])
+                                .font(.system(.body, design: .monospaced))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer()
+                            Button {
+                                _ = draft.identityFiles.remove(at: index)
+                            } label: {
+                                Image(systemName: "minus.circle")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                    Button {
+                        pickIdentityFile()
+                    } label: {
+                        Label("添加密钥文件…", systemImage: "plus")
+                    }
+                    Toggle("仅使用上面的密钥（IdentitiesOnly）", isOn: $draft.identitiesOnly)
+                    LabeledField(label: "保活间隔（秒）", hint: "可选") {
+                        TextField("", text: $draft.serverAliveInterval)
+                    }
+                }
+                Section("跳板 / 代理") {
+                    LabeledField(label: "ProxyJump", hint: "可选") {
+                        TextField("", text: $draft.proxyJump)
+                    }
+                    LabeledField(label: "ProxyCommand", hint: "可选") {
+                        TextField("", text: $draft.proxyCommand)
+                            .font(.system(.body, design: .monospaced))
+                    }
+                }
+                forwardSection(title: "本地转发", forwards: $draft.localForwards, isRemote: false)
+                forwardSection(title: "远程转发", forwards: $draft.remoteForwards, isRemote: true)
+                Section("其他选项（原样写回 config）") {
+                    ForEach($draft.otherOptions) { $option in
+                        HStack {
+                            TextField("键", text: $option.key)
+                                .frame(width: 160)
+                                .font(.system(.body, design: .monospaced))
+                            TextField("值", text: $option.value)
+                                .font(.system(.body, design: .monospaced))
+                            Button {
+                                draft.otherOptions.removeAll { $0.id == option.id }
+                            } label: {
+                                Image(systemName: "minus.circle")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                    Button {
+                        draft.otherOptions.append(RawOption(key: "", value: ""))
+                    } label: {
+                        Label("添加选项", systemImage: "plus")
+                    }
+                }
                 if let error = validationError {
                     Text(error)
                         .font(.callout)
@@ -52,73 +135,16 @@ struct HostEditorSheet: View {
             }
             .padding(12)
         }
-        .frame(width: 540, height: 660)
+        .frame(width: 540, height: 700)
     }
 
     // MARK: - 表单区块
-
-    private var basicSection: some View {
-        Section("基本") {
-            TextField("别名（空格分隔可设多个）", text: $aliasesText)
-            TextField("主机名 HostName（IP 或域名）", text: $draft.hostName)
-            TextField("用户（可选）", text: $draft.user)
-            TextField("端口（可选，默认 22）", text: $draft.port)
-            HStack {
-                TextField("分组（可选）", text: $groupText)
-                if !model.groups.isEmpty {
-                    Menu {
-                        ForEach(model.groups, id: \.self) { group in
-                            Button(group) { groupText = group }
-                        }
-                    } label: {
-                        Image(systemName: "chevron.up.chevron.down")
-                    }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
-                }
-            }
-        }
-    }
-
-    private var authSection: some View {
-        Section("认证") {
-            ForEach(draft.identityFiles.indices, id: \.self) { index in
-                HStack {
-                    Text(draft.identityFiles[index])
-                        .font(.system(.body, design: .monospaced))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
-                    Button {
-                        _ = draft.identityFiles.remove(at: index)
-                    } label: {
-                        Image(systemName: "minus.circle")
-                    }
-                    .buttonStyle(.borderless)
-                }
-            }
-            Button {
-                pickIdentityFile()
-            } label: {
-                Label("添加密钥文件…", systemImage: "plus")
-            }
-            Toggle("仅使用上面的密钥（IdentitiesOnly）", isOn: $draft.identitiesOnly)
-            TextField("保活间隔秒数 ServerAliveInterval（可选）", text: $draft.serverAliveInterval)
-        }
-    }
-
-    private var proxySection: some View {
-        Section("跳板 / 代理") {
-            TextField("ProxyJump（如 bastion）", text: $draft.proxyJump)
-            TextField("ProxyCommand（如 nc -X connect -x 127.0.0.1:7890 %h %p）", text: $draft.proxyCommand)
-        }
-    }
 
     private func forwardSection(title: String, forwards: Binding<[PortForward]>, isRemote: Bool) -> some View {
         Section(title) {
             ForEach(forwards) { $forward in
                 HStack {
-                    TextField("8080:localhost:80", text: $forward.raw)
+                    TextField("", text: $forward.raw)
                         .font(.system(.body, design: .monospaced))
                     Button {
                         forwards.wrappedValue.removeAll { $0.id == forward.id }
@@ -132,31 +158,6 @@ struct HostEditorSheet: View {
                 forwards.wrappedValue.append(PortForward(raw: ""))
             } label: {
                 Label(isRemote ? "添加远程转发" : "添加本地转发", systemImage: "plus")
-            }
-        }
-    }
-
-    private var otherOptionsSection: some View {
-        Section("其他选项（原样写回 config）") {
-            ForEach($draft.otherOptions) { $option in
-                HStack {
-                    TextField("键", text: $option.key)
-                        .frame(width: 160)
-                        .font(.system(.body, design: .monospaced))
-                    TextField("值", text: $option.value)
-                        .font(.system(.body, design: .monospaced))
-                    Button {
-                        draft.otherOptions.removeAll { $0.id == option.id }
-                    } label: {
-                        Image(systemName: "minus.circle")
-                    }
-                    .buttonStyle(.borderless)
-                }
-            }
-            Button {
-                draft.otherOptions.append(RawOption(key: "", value: ""))
-            } label: {
-                Label("添加选项", systemImage: "plus")
             }
         }
     }

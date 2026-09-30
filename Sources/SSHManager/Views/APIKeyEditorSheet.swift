@@ -34,32 +34,40 @@ struct APIKeyEditorSheet: View {
         VStack(spacing: 0) {
             Form {
                 Section("基本") {
-                    TextField("名称（如：智谱 / DeepSeek）", text: $name)
-                    TextField("BaseURL（如：https://api.example.com/v1）", text: $baseURL)
-                        .font(.system(.body, design: .monospaced))
-                    TextField("网站（服务商控制台，可选）", text: $website)
-                }
-                Section("密钥") {
-                    HStack {
-                        if showKey {
-                            TextField("sk-…", text: $apiKey)
-                                .font(.system(.body, design: .monospaced))
-                        } else {
-                            SecureField("sk-…", text: $apiKey)
-                                .font(.system(.body, design: .monospaced))
-                        }
-                        Button {
-                            showKey.toggle()
-                        } label: {
-                            Image(systemName: showKey ? "eye.slash" : "eye")
-                        }
-                        .buttonStyle(.borderless)
+                    LabeledField(label: "名称") {
+                        TextField("", text: $name)
+                    }
+                    LabeledField(label: "BaseURL") {
+                        TextField("", text: $baseURL)
+                            .font(.system(.body, design: .monospaced))
+                    }
+                    LabeledField(label: "网站", hint: "服务商控制台，可选") {
+                        TextField("", text: $website)
                     }
                 }
-                Section("模型（每行一个，可多个）") {
+                Section("密钥") {
+                    LabeledField(label: "API Key") {
+                        HStack {
+                            if showKey {
+                                TextField("", text: $apiKey)
+                                    .font(.system(.body, design: .monospaced))
+                            } else {
+                                SecureField("", text: $apiKey)
+                                    .font(.system(.body, design: .monospaced))
+                            }
+                            Button {
+                                showKey.toggle()
+                            } label: {
+                                Image(systemName: showKey ? "eye.slash" : "eye")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                }
+                Section("模型") {
                     ForEach(models.indices, id: \.self) { index in
                         HStack {
-                            TextField("glm-4.6", text: $models[index])
+                            TextField("", text: $models[index])
                                 .font(.system(.body, design: .monospaced))
                             Button {
                                 _ = models.remove(at: index)
@@ -93,7 +101,7 @@ struct APIKeyEditorSheet: View {
             }
             .padding(12)
         }
-        .frame(width: 520, height: 560)
+        .frame(width: 520, height: 600)
     }
 
     private func save() {
