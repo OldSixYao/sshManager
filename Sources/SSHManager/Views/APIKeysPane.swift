@@ -200,7 +200,7 @@ struct APIKeyDetailView: View {
 
     @State private var editorSession: APIKeyEditorSession?
     @State private var confirmDelete = false
-    @State private var revealKey = false
+    @State private var hideKey = false
     @State private var testOutcome: APIKeyTester.TestOutcome?
     @State private var isTesting = false
 
@@ -309,16 +309,26 @@ struct APIKeyDetailView: View {
                 GridRow {
                     keyLabel("API Key")
                     HStack {
-                        Text(revealKey ? key.apiKey : APIKeyTester.masked(key.apiKey))
-                            .font(.system(.body, design: .monospaced))
-                            .textSelection(.enabled)
+                        // 默认完整显示；空间放不下时自动中段省略，可用眼睛按钮手动隐藏
+                        Group {
+                            if hideKey {
+                                Text(APIKeyTester.masked(key.apiKey))
+                            } else {
+                                Text(key.apiKey)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                        }
+                        .font(.system(.body, design: .monospaced))
+                        .textSelection(.enabled)
+                        .layoutPriority(1)
                         Button {
-                            revealKey.toggle()
+                            hideKey.toggle()
                         } label: {
-                            Image(systemName: revealKey ? "eye.slash" : "eye")
+                            Image(systemName: hideKey ? "eye" : "eye.slash")
                         }
                         .buttonStyle(.borderless)
-                        .help(revealKey ? "隐藏" : "显示明文")
+                        .help(hideKey ? "显示明文" : "隐藏")
                         copyButton(key.apiKey)
                     }
                 }
