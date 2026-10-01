@@ -61,9 +61,10 @@ enum VendorLogoCache {
     private static func loadLogo(named file: String) -> NSImage? {
         let name = (file as NSString).deletingPathExtension
         let ext = (file as NSString).pathExtension
-        guard let url = Bundle.main.url(forResource: name, withExtension: ext),
-              let image = NSImage(contentsOf: url)
-        else { return nil }
+        // logos 打包在 Resources/logos/ 子目录，Bundle 查找必须显式指定 subdirectory
+        let url = Bundle.main.url(forResource: name, withExtension: ext, subdirectory: "logos")
+            ?? Bundle.main.url(forResource: name, withExtension: ext)
+        guard let url, let image = NSImage(contentsOf: url) else { return nil }
         return image
     }
 
