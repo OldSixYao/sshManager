@@ -32,9 +32,11 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detailPane: some View {
-        // 显式穷举所有侧栏分支（不用 default 兜底），
+        // 显式穷举所有侧栏分支（含 selection 为 nil 的情况，不用 default 兜底），
         // 未来新增 SidebarSelection 时编译器会强制处理，避免再出现漏分支
         switch selection {
+        case .none:
+            HostsPane(group: nil)
         case .allHosts:
             HostsPane(group: nil)
         case .group(let group):
