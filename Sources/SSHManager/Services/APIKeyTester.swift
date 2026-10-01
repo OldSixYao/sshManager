@@ -62,58 +62,107 @@ enum APIKeyTester {
         return "curl -s \(url) -H \"Authorization: Bearer \(key.apiKey)\""
     }
 
-    // MARK: - 连通性测试
+    // MARK: - 连通性测试与模型列表
 
-    /// 请求模型列表验证密钥。只会访问用户配置的 BaseURL。
-    static func test(key: APIKey, timeout: TimeInterval = 10) async -> TestOutcome {
-        guard let url = modelsURL(forBaseURL: key.baseURL) else {
-            return TestOutcome(isValid: false, latencyMs: 0, message: "BaseURL 无效")
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.timeoutInterval = timeout
-        request.setValue("Bearer \(key.apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-        let startedAt = Date()
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            let latencyMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-
-            switch status {
-            case 200:
-                let modelCount = modelCount(from: data)
-                let suffix = modelCount > 0 ? "，返回 \(modelCount) 个模型" : ""
-                return TestOutcome(isValid: true, latencyMs: latencyMs, message: "密钥有效（\(latencyMs)ms）\(suffix)")
-            case 401, 403:
-                return TestOutcome(isValid: false, latencyMs: latencyMs, message: "密钥无效或已被禁用（HTTP \(status)，\(latencyMs)ms）")
-            case 429:
-                return TestOutcome(isValid: true, latencyMs: latencyMs, message: "密钥有效但被限流（HTTP 429）")
-            case 404:
-                return TestOutcome(isValid: false, latencyMs: latencyMs, message: "端点不存在（HTTP 404）——检查 BaseURL 是否需要包含 /v1")
-            default:
-                return TestOutcome(isValid: false, latencyMs: latencyMs, message: "HTTP \(status)（\(latencyMs)ms）")
-            }
-        } catch {
-            let latencyMs = Int(Date().timeIntervalSince(startedAt) * 1000)
-            let nsError = error as NSError
-            let reason: String
-            if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorTimedOut {
-                reason = "请求超时（\(Int(timeout))s）"
-            } else {
-                reason = nsError.localizedDescription
-            }
-            return TestOutcome(isValid: false, latencyMs: latencyMs, message: "无法连接：\(reason)")
+    /// 按状态码给出可读的失败原因（测试与拉取模型共用）。
+    static func httpFailureMessage(_ status: Int) -> String {
+        switch status {
+        case 401, 403:
+            return "密钥无效或已被禁用（HTTP \(status)）"
+        case 429:
+            return "被限流（HTTP 429）"
+        case 404:
+            return "端点不存在（HTTP 404）——检查 BaseURL 是否需要包含 /v1"
+        default:
+            return "HTTP \(status)"
         }
     }
 
-    /// 从 OpenAI 兼容的 {"data":[{"id":...}]} 响应里数模型个数，解析失败返回 0。
-    private static func modelCount(from data: Data) -> Int {
-        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let list = object["data"] as? [[String: Any]]
-        else { return 0 }
-        return list.count
+    private static func performModelListRequest(
+        baseURL: String,
+        apiKey: String,
+        timeout: TimeInterval
+    ) async throws -> (data: Data, status: Int, latencyMs: Int) {
+        guard let url = modelsURL(forBaseURL: baseURL) else {
+            throw NSError(domain: "APIKeyTester", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "BaseURL 无效"])
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = timeout
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let startedAt = Date()
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let latencyMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        return (data, status, latencyMs)
+    }
+
+    /// 请求模型列表接口验证密钥。只会访问用户配置的 BaseURL。
+    static func test(key: APIKey, timeout: TimeInterval = 10) async -> TestOutcome {
+        do {
+            let (data, status, latencyMs) = try await performModelListRequest(
+                baseURL: key.baseURL,
+                apiKey: key.apiKey,
+                timeout: timeout
+            )
+            switch status {
+            case 200:
+                let count = parseModelIDs(from: data).count
+                let suffix = count > 0 ? "，返回 \(count) 个模型" : ""
+                return TestOutcome(isValid: true, latencyMs: latencyMs, message: "密钥有效（\(latencyMs)ms）\(suffix)")
+            case 429:
+                return TestOutcome(isValid: true, latencyMs: latencyMs, message: "密钥有效但被限流（HTTP 429）")
+            default:
+                return TestOutcome(isValid: false, latencyMs: latencyMs,
+                                   message: "\(httpFailureMessage(status))（\(latencyMs)ms）")
+            }
+        } catch {
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorTimedOut {
+                return TestOutcome(isValid: false, latencyMs: 0, message: "请求超时（\(Int(timeout))s）")
+            }
+            return TestOutcome(isValid: false, latencyMs: 0, message: "无法连接：\(error.localizedDescription)")
+        }
+    }
+
+    /// 拉取该密钥可用的全部模型 id。失败抛错（信息可直接展示给用户）。
+    static func fetchModelIDs(baseURL: String, apiKey: String, timeout: TimeInterval = 10) async throws -> [String] {
+        let (data, status, _) = try await performModelListRequest(baseURL: baseURL, apiKey: apiKey, timeout: timeout)
+        guard (200..<300).contains(status) else {
+            throw NSError(domain: "APIKeyTester", code: status,
+                          userInfo: [NSLocalizedDescriptionKey: httpFailureMessage(status)])
+        }
+        return parseModelIDs(from: data)
+    }
+
+    /// 解析模型列表响应：OpenAI 兼容 {"data":[{"id":…}]}；
+    /// 兼容 {"models":[{"id"/"name":…}]}（name 形如 "models/xxx" 时去掉前缀）。
+    /// 去重、保序；解析不出返回空数组。
+    static func parseModelIDs(from data: Data) -> [String] {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
+
+        var ids: [String] = []
+        func append(_ value: Any?) {
+            guard let raw = value as? String else { return }
+            let id = raw.hasPrefix("models/") ? String(raw.dropFirst("models/".count)) : raw
+            if !id.isEmpty, !ids.contains(id) {
+                ids.append(id)
+            }
+        }
+
+        if let list = object["data"] as? [[String: Any]] {
+            for entry in list {
+                append(entry["id"])
+            }
+        }
+        if ids.isEmpty, let list = object["models"] as? [[String: Any]] {
+            for entry in list {
+                append(entry["id"] ?? entry["name"])
+            }
+        }
+        return ids
     }
 }

@@ -20,6 +20,9 @@ struct APIKeyEditorSheet: View {
     @State private var showKey: Bool
     @State private var models: [String]
     @State private var validationError: String?
+    @State private var isFetchingModels = false
+    @State private var fetchMessage: String?
+    @State private var fetchFailed = false
 
     init(session: APIKeyEditorSession) {
         self.session = session
@@ -75,10 +78,30 @@ struct APIKeyEditorSheet: View {
                                 .buttonStyle(.borderless)
                             }
                         }
-                        Button {
-                            models.append("")
-                        } label: {
-                            Label("添加模型", systemImage: "plus")
+                        HStack(spacing: 14) {
+                            Button {
+                                models.append("")
+                            } label: {
+                                Label("添加模型", systemImage: "plus")
+                            }
+                            Button {
+                                fetchModels()
+                            } label: {
+                                if isFetchingModels {
+                                    HStack(spacing: 6) {
+                                        ProgressView().controlSize(.small)
+                                        Text("获取中…")
+                                    }
+                                } else {
+                                    Label("自动获取模型", systemImage: "arrow.down.circle")
+                                }
+                            }
+                            .disabled(isFetchingModels)
+                        }
+                        if let message = fetchMessage {
+                            Text(message)
+                                .font(.caption)
+                                .foregroundStyle(fetchFailed ? Color.red : Color.green)
                         }
                     }
                     if let error = validationError {
@@ -101,6 +124,36 @@ struct APIKeyEditorSheet: View {
             .padding(12)
         }
         .frame(width: 520, height: 600)
+    }
+
+    /// 请求该密钥的模型列表接口，把返回的模型 id 去重后合并进列表。
+    private func fetchModels() {
+        let trimmedBaseURL = baseURL.trimmingCharacters(in: .whitespaces)
+        let trimmedKey = apiKey.trimmingCharacters(in: .whitespaces)
+        guard !trimmedBaseURL.isEmpty, !trimmedKey.isEmpty else {
+            fetchFailed = true
+            fetchMessage = "请先填写 BaseURL 和 API Key"
+            return
+        }
+
+        isFetchingModels = true
+        fetchMessage = nil
+        Task {
+            do {
+                let ids = try await APIKeyTester.fetchModelIDs(baseURL: trimmedBaseURL, apiKey: trimmedKey)
+                let existing = Set(models.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
+                let fresh = ids.filter { !existing.contains($0) }
+                models = models.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty } + fresh
+                fetchFailed = false
+                fetchMessage = fresh.isEmpty
+                    ? "没有新增：服务端返回 \(ids.count) 个模型，均已存在"
+                    : "已添加 \(fresh.count) 个模型（服务端共 \(ids.count) 个）"
+            } catch {
+                fetchFailed = true
+                fetchMessage = "获取失败：\(error.localizedDescription)"
+            }
+            isFetchingModels = false
+        }
     }
 
     private func save() {

@@ -132,6 +132,7 @@ open dist/SSHManager.app        # 或直接双击
 - **搜索**：按名称 / 域名 / 模型实时过滤
 - **一键复制**：详情页 BaseURL、API Key、每个模型旁都有复制按钮；API Key 默认显示为 `sk-a…wxyz` 打码形式，点眼睛图标显示明文
 - **连通性测试**：详情页 `连通性测试` 按钮请求 `{BaseURL}` 的模型列表接口（`/v数字` 结尾的路径接 `/models`，否则拼 `/v1/models`），结果显示有效性、延迟与原因（401/403 密钥无效、429 有效但限流、404 端点不对等）
+- **自动获取模型**：编辑表单里填好 BaseURL 与 API Key 后，点「自动获取模型」拉取该 key 可用的全部模型 id 并去重合并进模型列表（兼容 OpenAI `data[].id` 与 Gemini 风格 `models[].name` 两种响应）
 - **复制 curl 示例**：生成可直接回车的 `curl -s <models-url> -H "Authorization: Bearer <key>"`（含真实密钥，便于终端调试）
 - **打开官网**：一键跳转服务商控制台
 - **存储**：`~/Library/Application Support/SSHManager/apikeys.json`，权限 600、原子写入；连通性测试只会访问你自己填写的 BaseURL

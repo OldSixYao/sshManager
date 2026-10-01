@@ -73,6 +73,20 @@ struct APIKeyTests {
         #expect(APIKeyTester.masked("123456789") == "1234…6789")
     }
 
+    @Test func parseModelIDs() {
+        // OpenAI 兼容形态，且自动去重保序
+        let openAI = Data(#"{"data":[{"id":"gpt-4o"},{"id":"gpt-4o-mini"},{"id":"gpt-4o"}]}"#.utf8)
+        #expect(APIKeyTester.parseModelIDs(from: openAI) == ["gpt-4o", "gpt-4o-mini"])
+
+        // models[].name 形态（Gemini 风格），去掉 models/ 前缀
+        let gemini = Data(#"{"models":[{"name":"models/gemini-2.0"},{"name":"models/gemini-1.5"}]}"#.utf8)
+        #expect(APIKeyTester.parseModelIDs(from: gemini) == ["gemini-2.0", "gemini-1.5"])
+
+        // 空列表与非法 JSON
+        #expect(APIKeyTester.parseModelIDs(from: Data(#"{"data":[]}"#.utf8)).isEmpty)
+        #expect(APIKeyTester.parseModelIDs(from: Data("not json".utf8)).isEmpty)
+    }
+
     @Test func curlExample() {
         let key = APIKey(name: "t", baseURL: "https://api.example.com/v1", apiKey: "sk-secret")
         #expect(
