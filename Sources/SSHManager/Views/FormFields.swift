@@ -24,9 +24,10 @@ struct LabeledField<Content: View>: View {
     }
 }
 
-/// 自绘分区卡片：替代 Form(.formStyle(.grouped))。
+/// 自绘分区容器：替代 Form(.formStyle(.grouped))。
 /// macOS 26 分组表单会把 TextField 的光标/内容渲染到行右侧，Form 内无法修复，
 /// 因此表单改为 ScrollView + 本组件的完全自绘布局。
+/// 与底板同色（不另加卡片填充），仅靠标题与间距分组。
 struct FormSectionCard<Content: View>: View {
     let title: String
     @ViewBuilder var content: Content
@@ -38,9 +39,8 @@ struct FormSectionCard<Content: View>: View {
             VStack(alignment: .leading, spacing: 12) {
                 content
             }
-            .padding(14)
+            .padding(.leading, 2)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.08)))
         }
     }
 }
