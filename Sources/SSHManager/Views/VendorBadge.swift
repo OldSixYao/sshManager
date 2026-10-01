@@ -31,8 +31,9 @@ struct VendorBadge: View {
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
+                    // 先内缩图形、后固定徽章外框：顺序反了会把图形撑出圆底
+                    .padding(size * 0.20)
                     .frame(width: size, height: size)
-                    .padding(size * 0.18)
             } else {
                 Text(vendor.monogram)
                     .font(.system(size: size * (vendor.monogram.count > 1 ? 0.38 : 0.52), weight: .bold))
