@@ -37,6 +37,8 @@ struct ContentView: View {
             ForwardingView()
         case .keys:
             KeysView()
+        case .allAPIKeys:
+            APIKeysPane(provider: nil)
         case .apiKeyGroup(let provider):
             APIKeysPane(provider: provider)
         default:
