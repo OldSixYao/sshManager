@@ -24,6 +24,8 @@ struct APIKeyEditorSheet: View {
     @State private var isFetchingModels = false
     @State private var fetchMessage: String?
     @State private var fetchFailed = false
+    /// 上一次自动填充 BaseURL/网站 所依据的供应商；nil 表示尚未自动填充过
+    @State private var autoFilledFrom: String?
 
     init(session: APIKeyEditorSession) {
         self.session = session
@@ -44,7 +46,7 @@ struct APIKeyEditorSheet: View {
                         LabeledField(label: "名称") {
                             LeadingTextField(text: $name)
                         }
-                        LabeledField(label: "供应商", hint: "分组用，可新建或从已有选择") {
+                        LabeledField(label: "供应商", hint: "已有供应商会自动带出 BaseURL 和网站") {
                             HStack(spacing: 8) {
                                 LeadingTextField(text: $provider)
                                 if !model.providers.isEmpty {
@@ -130,6 +132,9 @@ struct APIKeyEditorSheet: View {
                 }
                 .padding(16)
             }
+            .onChange(of: provider) { _, newValue in
+                autoFillFromProvider(newValue)
+            }
 
             Divider()
             HStack {
@@ -142,6 +147,30 @@ struct APIKeyEditorSheet: View {
             .padding(12)
         }
         .frame(width: 520, height: 600)
+    }
+
+    /// 新增时，供应商匹配到已有供应商则带出其 BaseURL 和网站。
+    /// 只在字段为空或此前是自动填充的情况下覆盖，不吞掉用户手动输入的内容。
+    private func autoFillFromProvider(_ newValue: String) {
+        guard session.key == nil else { return }
+        let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty,
+              let match = model.keys.first(where: {
+                  $0.provider.caseInsensitiveCompare(trimmed) == .orderedSame
+              })
+        else {
+            autoFilledFrom = nil
+            return
+        }
+        guard autoFilledFrom != match.provider else { return }
+
+        if baseURL.trimmingCharacters(in: .whitespaces).isEmpty || autoFilledFrom != nil {
+            baseURL = match.baseURL
+        }
+        if website.trimmingCharacters(in: .whitespaces).isEmpty || autoFilledFrom != nil {
+            website = match.website
+        }
+        autoFilledFrom = match.provider
     }
 
     /// 请求该密钥的模型列表接口，把返回的模型 id 去重后合并进列表。
