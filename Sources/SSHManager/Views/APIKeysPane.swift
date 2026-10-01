@@ -17,6 +17,8 @@ func apiKeyDisplayHost(_ key: APIKey) -> String {
 /// API 密钥主区：左列密钥列表（搜索），右侧详情（复制 / 测活 / 官网 / curl）。
 struct APIKeysPane: View {
     @EnvironmentObject private var model: APIKeysModel
+    /// 非 nil 时只显示该供应商下的密钥（侧栏供应商分组进入）。
+    let provider: String?
 
     @State private var searchText = ""
     @State private var selectedID: UUID?
@@ -60,14 +62,21 @@ struct APIKeysPane: View {
     // MARK: - 数据
 
     private var visibleKeys: [APIKey] {
-        guard !searchText.isEmpty else { return model.keys }
-        let query = searchText.lowercased()
-        return model.keys.filter { key in
-            key.name.lowercased().contains(query)
-                || key.baseURL.lowercased().contains(query)
-                || key.website.lowercased().contains(query)
-                || key.models.contains { $0.lowercased().contains(query) }
+        var result = model.keys
+        if let provider {
+            result = result.filter { $0.provider == provider }
         }
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            result = result.filter { key in
+                key.name.lowercased().contains(query)
+                    || key.provider.lowercased().contains(query)
+                    || key.baseURL.lowercased().contains(query)
+                    || key.website.lowercased().contains(query)
+                    || key.models.contains { $0.lowercased().contains(query) }
+            }
+        }
+        return result
     }
 
     // MARK: - 列表列
@@ -131,8 +140,17 @@ struct APIKeysPane: View {
             selectedID = key.id
         } label: {
             VStack(alignment: .leading, spacing: 2) {
-                Text(key.name)
-                    .fontWeight(.medium)
+                HStack(spacing: 6) {
+                    Text(key.name)
+                        .fontWeight(.medium)
+                    if !key.provider.isEmpty {
+                        Text(key.provider)
+                            .font(.caption2)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                    }
+                }
                 Text(apiKeyDisplayHost(key))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -224,6 +242,21 @@ struct APIKeyDetailView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Picker("供应商", selection: Binding(
+                get: { key.provider },
+                set: { newValue in
+                    var updated = key
+                    updated.provider = newValue
+                    _ = model.save(updated)
+                }
+            )) {
+                Text("未分组").tag("")
+                ForEach(model.providers, id: \.self) { provider in
+                    Text(provider).tag(provider)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(width: 170)
         }
     }
 

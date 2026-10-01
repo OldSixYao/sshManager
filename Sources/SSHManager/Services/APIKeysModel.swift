@@ -23,6 +23,18 @@ final class APIKeysModel: ObservableObject {
         }
     }
 
+    // MARK: - 供应商分组
+
+    /// 全部供应商（非空 provider 去重排序）。
+    var providers: [String] {
+        Array(Set(keys.map(\.provider).filter { !$0.isEmpty })).sorted()
+    }
+
+    /// 某供应商下的密钥。
+    func keys(in provider: String) -> [APIKey] {
+        keys.filter { $0.provider == provider }
+    }
+
     /// 新增或更新（按 id 判断），成功返回 true。
     @discardableResult
     func save(_ key: APIKey) -> Bool {

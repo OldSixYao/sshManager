@@ -3,9 +3,10 @@ import SwiftUI
 enum SidebarSelection: Hashable {
     case allHosts
     case group(String)
+    case allAPIKeys
+    case apiKeyGroup(String)
     case forwarding
     case keys
-    case apiKeys
 }
 
 struct ContentView: View {
@@ -36,8 +37,8 @@ struct ContentView: View {
             ForwardingView()
         case .keys:
             KeysView()
-        case .apiKeys:
-            APIKeysPane()
+        case .apiKeyGroup(let provider):
+            APIKeysPane(provider: provider)
         default:
             HostsPane(group: groupFilter)
         }
@@ -75,9 +76,14 @@ struct SidebarView: View {
                 }
                 sectionTitle("API 密钥")
                     .padding(.top, 12)
-                SidebarRow(selection: $selection, value: .apiKeys,
+                SidebarRow(selection: $selection, value: .allAPIKeys,
                            title: "全部密钥", systemImage: "key.horizontal",
                            badge: apiKeys.keys.count)
+                ForEach(apiKeys.providers, id: \.self) { provider in
+                    SidebarRow(selection: $selection, value: .apiKeyGroup(provider),
+                               title: provider, systemImage: "folder",
+                               badge: apiKeys.keys(in: provider).count)
+                }
                 sectionTitle("工具")
                     .padding(.top, 12)
                 SidebarRow(selection: $selection, value: .forwarding,

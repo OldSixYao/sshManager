@@ -1,9 +1,11 @@
 import Foundation
 
 /// 一条 API 密钥记录（LLM 开放接口为主：BaseURL + 密钥 + 模型列表）。
+/// provider 为供应商分组名（如「智谱」「OpenRouter」），空字符串表示未分组。
 struct APIKey: Identifiable, Codable, Equatable {
     var id: UUID
     var name: String
+    var provider: String
     var baseURL: String
     var apiKey: String
     var website: String
@@ -13,6 +15,7 @@ struct APIKey: Identifiable, Codable, Equatable {
     init(
         id: UUID = UUID(),
         name: String,
+        provider: String = "",
         baseURL: String,
         apiKey: String,
         website: String = "",
@@ -21,6 +24,7 @@ struct APIKey: Identifiable, Codable, Equatable {
     ) {
         self.id = id
         self.name = name
+        self.provider = provider
         self.baseURL = baseURL
         self.apiKey = apiKey
         self.website = website
@@ -32,6 +36,7 @@ struct APIKey: Identifiable, Codable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try container.decode(String.self, forKey: .name)
+        provider = try container.decodeIfPresent(String.self, forKey: .provider) ?? ""
         baseURL = try container.decode(String.self, forKey: .baseURL)
         apiKey = try container.decode(String.self, forKey: .apiKey)
         website = try container.decodeIfPresent(String.self, forKey: .website) ?? ""

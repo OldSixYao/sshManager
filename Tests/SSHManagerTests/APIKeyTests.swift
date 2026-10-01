@@ -17,6 +17,7 @@ struct APIKeyTests {
 
         let key = APIKey(
             name: "智谱",
+            provider: "国内",
             baseURL: "https://open.bigmodel.cn/api/paas/v4",
             apiKey: "sk-test-1234567890abcdef",
             website: "https://open.bigmodel.cn",
@@ -27,12 +28,24 @@ struct APIKeyTests {
         #expect(loaded.count == 1)
         #expect(loaded[0].id == key.id)
         #expect(loaded[0].name == "智谱")
+        #expect(loaded[0].provider == "国内")
         #expect(loaded[0].baseURL == key.baseURL)
         #expect(loaded[0].apiKey == key.apiKey)
         #expect(loaded[0].models == ["glm-4.6", "glm-4.5-air"])
 
         let attributes = try FileManager.default.attributesOfItem(atPath: store.fileURL.path)
         #expect((attributes[.posixPermissions] as? NSNumber)?.int16Value == 0o600, "密钥文件权限应为 600")
+    }
+
+    @Test func legacyJSONWithoutProviderDecodesAsUngrouped() throws {
+        // 供应商字段加入前的旧格式应能正常读取，provider 视为未分组
+        let legacy = #"{"name":"旧记录","baseURL":"https://api.example.com","apiKey":"sk-x","createdAt":"2026-01-02T03:04:05Z"}"#
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let key = try decoder.decode(APIKey.self, from: Data(legacy.utf8))
+        #expect(key.name == "旧记录")
+        #expect(key.provider.isEmpty)
+        #expect(key.models.isEmpty)
     }
 
     @Test func normalizeBaseURL() {

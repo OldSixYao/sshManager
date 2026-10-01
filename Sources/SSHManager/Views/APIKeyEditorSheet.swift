@@ -14,6 +14,7 @@ struct APIKeyEditorSheet: View {
     let session: APIKeyEditorSession
 
     @State private var name: String
+    @State private var provider: String
     @State private var baseURL: String
     @State private var website: String
     @State private var apiKey: String
@@ -27,6 +28,7 @@ struct APIKeyEditorSheet: View {
     init(session: APIKeyEditorSession) {
         self.session = session
         _name = State(wrappedValue: session.key?.name ?? "")
+        _provider = State(wrappedValue: session.key?.provider ?? "")
         _baseURL = State(wrappedValue: session.key?.baseURL ?? "")
         _website = State(wrappedValue: session.key?.website ?? "")
         _apiKey = State(wrappedValue: session.key?.apiKey ?? "")
@@ -41,6 +43,22 @@ struct APIKeyEditorSheet: View {
                     FormSectionCard(title: "基本") {
                         LabeledField(label: "名称") {
                             LeadingTextField(text: $name)
+                        }
+                        LabeledField(label: "供应商", hint: "分组用，可新建或从已有选择") {
+                            HStack(spacing: 8) {
+                                LeadingTextField(text: $provider)
+                                if !model.providers.isEmpty {
+                                    Menu {
+                                        ForEach(model.providers, id: \.self) { existing in
+                                            Button(existing) { provider = existing }
+                                        }
+                                    } label: {
+                                        Image(systemName: "chevron.up.chevron.down")
+                                    }
+                                    .menuStyle(.borderlessButton)
+                                    .fixedSize()
+                                }
+                            }
                         }
                         LabeledField(label: "BaseURL") {
                             LeadingTextField(text: $baseURL, monospaced: true)
@@ -175,6 +193,7 @@ struct APIKeyEditorSheet: View {
 
         var key = session.key ?? APIKey(name: trimmedName, baseURL: trimmedBaseURL, apiKey: trimmedKey)
         key.name = trimmedName
+        key.provider = provider.trimmingCharacters(in: .whitespaces)
         key.baseURL = trimmedBaseURL
         key.apiKey = trimmedKey
         key.website = website.trimmingCharacters(in: .whitespaces)
