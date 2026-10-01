@@ -32,23 +32,22 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detailPane: some View {
+        // 显式穷举所有侧栏分支（不用 default 兜底），
+        // 未来新增 SidebarSelection 时编译器会强制处理，避免再出现漏分支
         switch selection {
-        case .forwarding:
-            ForwardingView()
-        case .keys:
-            KeysView()
+        case .allHosts:
+            HostsPane(group: nil)
+        case .group(let group):
+            HostsPane(group: group)
         case .allAPIKeys:
             APIKeysPane(provider: nil)
         case .apiKeyGroup(let provider):
             APIKeysPane(provider: provider)
-        default:
-            HostsPane(group: groupFilter)
+        case .forwarding:
+            ForwardingView()
+        case .keys:
+            KeysView()
         }
-    }
-
-    private var groupFilter: String? {
-        if case .group(let group) = selection { return group }
-        return nil
     }
 
     private var errorBinding: Binding<Bool> {
