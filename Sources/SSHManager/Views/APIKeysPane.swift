@@ -141,6 +141,9 @@ struct APIKeysPane: View {
         } label: {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
+                    if !key.vendor.isEmpty {
+                        VendorBadge(vendor: AIVendor.matching(id: key.vendor), size: 17)
+                    }
                     Text(key.name)
                         .fontWeight(.medium)
                     if !key.provider.isEmpty {
@@ -297,6 +300,13 @@ struct APIKeyDetailView: View {
     private var infoSection: some View {
         section("连接信息") {
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
+                GridRow {
+                    keyLabel("AI 厂商")
+                    HStack(spacing: 7) {
+                        VendorBadge(vendor: AIVendor.matching(id: key.vendor), size: 20)
+                        Text(AIVendor.matching(id: key.vendor).name)
+                    }
+                }
                 GridRow {
                     keyLabel("BaseURL")
                     HStack {

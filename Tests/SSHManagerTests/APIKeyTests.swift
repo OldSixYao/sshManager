@@ -18,6 +18,7 @@ struct APIKeyTests {
         let key = APIKey(
             name: "智谱",
             provider: "国内",
+            vendor: "zhipu",
             baseURL: "https://open.bigmodel.cn/api/paas/v4",
             apiKey: "sk-test-1234567890abcdef",
             website: "https://open.bigmodel.cn",
@@ -29,6 +30,7 @@ struct APIKeyTests {
         #expect(loaded[0].id == key.id)
         #expect(loaded[0].name == "智谱")
         #expect(loaded[0].provider == "国内")
+        #expect(loaded[0].vendor == "zhipu")
         #expect(loaded[0].baseURL == key.baseURL)
         #expect(loaded[0].apiKey == key.apiKey)
         #expect(loaded[0].models == ["glm-4.6", "glm-4.5-air"])

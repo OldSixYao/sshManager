@@ -15,6 +15,7 @@ struct APIKeyEditorSheet: View {
 
     @State private var name: String
     @State private var provider: String
+    @State private var vendorId: String
     @State private var baseURL: String
     @State private var website: String
     @State private var apiKey: String
@@ -31,6 +32,7 @@ struct APIKeyEditorSheet: View {
         self.session = session
         _name = State(wrappedValue: session.key?.name ?? "")
         _provider = State(wrappedValue: session.key?.provider ?? "")
+        _vendorId = State(wrappedValue: session.key?.vendor ?? "")
         _baseURL = State(wrappedValue: session.key?.baseURL ?? "")
         _website = State(wrappedValue: session.key?.website ?? "")
         _apiKey = State(wrappedValue: session.key?.apiKey ?? "")
@@ -67,6 +69,36 @@ struct APIKeyEditorSheet: View {
                         }
                         LabeledField(label: "网站", hint: "服务商控制台，可选") {
                             LeadingTextField(text: $website)
+                        }
+                    }
+                    FormSectionCard(title: "AI 厂商") {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], spacing: 8) {
+                            ForEach(AIVendor.all) { vendor in
+                                let isSelected = vendorId == vendor.id
+                                Button {
+                                    vendorId = vendor.id
+                                } label: {
+                                    HStack(spacing: 7) {
+                                        VendorBadge(vendor: vendor, size: 20)
+                                        Text(vendor.name)
+                                            .lineLimit(1)
+                                        Spacer(minLength: 0)
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.045))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .strokeBorder(isSelected ? Color.accentColor : Color.secondary.opacity(0.25),
+                                                          lineWidth: isSelected ? 1.5 : 1)
+                                    )
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
                     FormSectionCard(title: "密钥") {
@@ -170,6 +202,9 @@ struct APIKeyEditorSheet: View {
         if website.trimmingCharacters(in: .whitespaces).isEmpty || autoFilledFrom != nil {
             website = match.website
         }
+        if vendorId.isEmpty, !match.vendor.isEmpty {
+            vendorId = match.vendor
+        }
         autoFilledFrom = match.provider
     }
 
@@ -223,6 +258,7 @@ struct APIKeyEditorSheet: View {
         var key = session.key ?? APIKey(name: trimmedName, baseURL: trimmedBaseURL, apiKey: trimmedKey)
         key.name = trimmedName
         key.provider = provider.trimmingCharacters(in: .whitespaces)
+        key.vendor = vendorId
         key.baseURL = trimmedBaseURL
         key.apiKey = trimmedKey
         key.website = website.trimmingCharacters(in: .whitespaces)

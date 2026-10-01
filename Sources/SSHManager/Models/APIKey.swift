@@ -6,6 +6,7 @@ struct APIKey: Identifiable, Codable, Equatable {
     var id: UUID
     var name: String
     var provider: String
+    var vendor: String
     var baseURL: String
     var apiKey: String
     var website: String
@@ -16,6 +17,7 @@ struct APIKey: Identifiable, Codable, Equatable {
         id: UUID = UUID(),
         name: String,
         provider: String = "",
+        vendor: String = "",
         baseURL: String,
         apiKey: String,
         website: String = "",
@@ -25,6 +27,7 @@ struct APIKey: Identifiable, Codable, Equatable {
         self.id = id
         self.name = name
         self.provider = provider
+        self.vendor = vendor
         self.baseURL = baseURL
         self.apiKey = apiKey
         self.website = website
@@ -37,6 +40,7 @@ struct APIKey: Identifiable, Codable, Equatable {
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try container.decode(String.self, forKey: .name)
         provider = try container.decodeIfPresent(String.self, forKey: .provider) ?? ""
+        vendor = try container.decodeIfPresent(String.self, forKey: .vendor) ?? ""
         baseURL = try container.decode(String.self, forKey: .baseURL)
         apiKey = try container.decode(String.self, forKey: .apiKey)
         website = try container.decodeIfPresent(String.self, forKey: .website) ?? ""
