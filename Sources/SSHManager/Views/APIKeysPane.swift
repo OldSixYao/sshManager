@@ -170,9 +170,18 @@ struct APIKeysPane: View {
         .buttonStyle(.plain)
         .contextMenu {
             Button("编辑…") { editorSession = APIKeyEditorSession(key: key) }
+            Button("导入到 CC Switch") { importKeyViaCCSwitch(key) }
             Divider()
             Button("删除…", role: .destructive) { keyPendingDelete = key }
         }
+    }
+
+    private func importKeyViaCCSwitch(_ key: APIKey) {
+        guard CCSwitchExporter.isAvailable() else {
+            model.errorMessage = "未检测到 CC Switch：请先安装 CC Switch 并至少启动一次（注册 ccswitch:// 协议）后再试。"
+            return
+        }
+        _ = CCSwitchExporter.importKey(key)
     }
 
     // MARK: - 详情列
@@ -285,6 +294,13 @@ struct APIKeyDetailView: View {
             } label: {
                 Label("复制 curl 示例", systemImage: "doc.on.doc")
             }
+
+            Button {
+                importToCCSwitch()
+            } label: {
+                Label("导入到 CC Switch", systemImage: "square.and.arrow.down.on.square")
+            }
+            .help("生成 ccswitch:// 深度链接，由 CC Switch 弹窗确认后导入")
 
             Spacer()
 
@@ -420,6 +436,18 @@ struct APIKeyDetailView: View {
                 testOutcome = outcome
                 isTesting = false
             }
+        }
+    }
+
+    /// 通过 ccswitch:// 深度链接交给 CC Switch 弹窗确认导入
+    private func importToCCSwitch() {
+        guard CCSwitchExporter.isAvailable() else {
+            model.errorMessage = "未检测到 CC Switch：请先安装 CC Switch 并至少启动一次（注册 ccswitch:// 协议）后再试。"
+            return
+        }
+        guard CCSwitchExporter.importKey(key) else {
+            model.errorMessage = "打开 ccswitch:// 链接失败，请确认 CC Switch 已安装。"
+            return
         }
     }
 

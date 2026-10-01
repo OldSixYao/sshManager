@@ -102,6 +102,38 @@ struct APIKeyTests {
         #expect(APIKeyTester.parseModelIDs(from: Data("not json".utf8)).isEmpty)
     }
 
+    @Test func ccSwitchDeepLink() throws {
+        let key = APIKey(
+            name: "deepkey OpenAI",
+            provider: "deepkey",
+            vendor: "openai",
+            baseURL: "https://deepkey.top/v1",
+            apiKey: "sk-secret-123",
+            website: "https://deepkey.top",
+            models: ["gpt-5.6-sol", "gpt-5.5"]
+        )
+        let url = try #require(CCSwitchExporter.deepLink(for: key))
+        #expect(url.scheme == "ccswitch")
+        #expect(url.host == "v1")
+        #expect(url.path == "/import")
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+            .queryItems!
+        #expect(URLQueryItem(name: "resource", value: "provider") == items.first { $0.name == "resource" })
+        #expect(items.first { $0.name == "app" }?.value == "codex")
+        #expect(items.first { $0.name == "name" }?.value == "deepkey OpenAI")
+        #expect(items.first { $0.name == "endpoint" }?.value == "https://deepkey.top/v1")
+        #expect(items.first { $0.name == "apiKey" }?.value == "sk-secret-123")
+        #expect(items.first { $0.name == "homepage" }?.value == "https://deepkey.top")
+        #expect(items.first { $0.name == "model" }?.value == "gpt-5.6-sol")
+        #expect(items.first { $0.name == "notes" }?.value?.contains("deepkey") == true)
+
+        // Claude 厂商映射到 claude 应用
+        let claudeKey = APIKey(name: "c", vendor: "claude", baseURL: "https://a.com", apiKey: "k")
+        #expect(CCSwitchExporter.appType(for: claudeKey) == "claude")
+        let geminiKey = APIKey(name: "g", vendor: "gemini", baseURL: "https://g.com", apiKey: "k")
+        #expect(CCSwitchExporter.appType(for: geminiKey) == "gemini")
+    }
+
     @Test func curlExample() {
         let key = APIKey(name: "t", baseURL: "https://api.example.com/v1", apiKey: "sk-secret")
         #expect(

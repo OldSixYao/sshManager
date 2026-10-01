@@ -132,6 +132,7 @@ open dist/SSHManager.app        # 或直接双击
 - **搜索**：按名称 / 供应商 / 域名 / 模型实时过滤
 - **供应商分组**：编辑表单里填写供应商名（可新建或从已有选择），侧栏 API 密钥区按供应商分组浏览（带数量徽标）；详情页右上角可快捷改组；选已有供应商会自动带出其 BaseURL / 网站 / AI 厂商
 - **AI 厂商**：以「图标 + 名称」芯片网格选择（OpenAI / Claude / DeepSeek / Gemini / 智谱 GLM / Kimi / 通义千问 / Grok / Mistral / 通用），列表与详情页显示厂商徽章
+- **导入到 CC Switch**：详情页或右键菜单一键生成 `ccswitch://v1/import` 深度链接（app 类型按厂商映射：claude→claude、gemini→gemini、其余→codex），由 CC Switch 弹窗确认后完成导入；需本机装有 CC Switch
 - **一键复制**：详情页 BaseURL、API Key、每个模型旁都有复制按钮；API Key 默认完整显示（空间放不下自动中段省略），可点眼睛按钮临时隐藏；编辑表单中默认为掩码输入
 - **连通性测试**：详情页 `连通性测试` 按钮请求 `{BaseURL}` 的模型列表接口（`/v数字` 结尾的路径接 `/models`，否则拼 `/v1/models`），结果显示有效性、延迟与原因（401/403 密钥无效、429 有效但限流、404 端点不对等）
 - **自动获取模型**：编辑表单里填好 BaseURL 与 API Key 后，点「自动获取模型」拉取该 key 可用的全部模型 id 并去重合并进模型列表（兼容 OpenAI `data[].id` 与 Gemini 风格 `models[].name` 两种响应）
