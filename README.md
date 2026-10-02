@@ -136,7 +136,7 @@ open dist/SSHManager.app        # 或直接双击
 - **一键复制**：详情页 BaseURL、API Key、每个模型旁都有复制按钮；API Key 默认完整显示（空间放不下自动中段省略），可点眼睛按钮临时隐藏；编辑表单中默认为掩码输入
 - **连通性测试**：详情页 `连通性测试` 按钮请求 `{BaseURL}` 的模型列表接口（`/v数字` 结尾的路径接 `/models`，否则拼 `/v1/models`），结果显示有效性、延迟与原因（401/403 密钥无效、429 有效但限流、404 端点不对等）
 - **自动获取模型**：编辑表单里填好 BaseURL 与 API Key 后，点「自动获取模型」拉取该 key 可用的全部模型 id 并去重合并进模型列表（兼容 OpenAI `data[].id` 与 Gemini 风格 `models[].name` 两种响应）
-- **查询余额**：详情页一键查询该密钥的剩余额度——one-api 系中转站走 `subscription/usage` 计费约定（剩余 = 总额度 − 近 100 天已用），DeepSeek 官方走其独立余额接口；其余供应商未实现标准计费接口时明确提示
+- **查询余额**：详情页一键查询该密钥的真实额度——优先 new-api 系中转站的令牌接口 `/api/usage/token/`（区分有限额度 / 不限量 / display 三种形态，500000 配额 = 1 USD，单位跟随站点返回），DeepSeek 官方走其独立余额接口；one-api 的 `subscription/usage` 仅作兜底（占位值视为不支持）
 - **复制 curl 示例**：生成可直接回车的 `curl -s <models-url> -H "Authorization: Bearer <key>"`（含真实密钥，便于终端调试）
 - **打开官网**：一键跳转服务商控制台
 - **存储**：`~/Library/Application Support/SSHManager/apikeys.json`，权限 600、原子写入；连通性测试只会访问你自己填写的 BaseURL

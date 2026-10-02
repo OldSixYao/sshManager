@@ -149,7 +149,87 @@ enum APIKeyTester {
         var message: String
     }
 
-    /// 计费端点：沿用版本路径规则（/v1 结尾接 dashboard/billing/…，否则补 /v1）。
+    /// new-api 系中转站的令牌级用量接口：{站点根}/api/usage/token/（Bearer 即 API key）。
+    /// 响应单位为内部配额，500000 = 1 USD；new-api 变体会直接给 display{remaining,total,used,unit}。
+    static func tokenUsageURL(forBaseURL raw: String) -> URL? {
+        guard let base = normalizeBaseURL(raw),
+              var components = URLComponents(url: base, resolvingAgainstBaseURL: false)
+        else { return nil }
+        var path = components.path
+        // 去掉结尾的 /v1、/v4 等版本段，回到站点根
+        if let match = versionedPathRegex.firstMatch(
+            in: path, range: NSRange(path.startIndex..., in: path)),
+           let matchRange = Range(match.range, in: path) {
+            path = String(path[..<matchRange.lowerBound])
+        }
+        components.path = path + "/api/usage/token/"
+        return components.url
+    }
+
+    /// 令牌用量接口的三种返回形态。
+    struct TokenUsage {
+        enum Kind {
+            /// new-api display 对象，自带金额与单位
+            case display
+            /// 不限量套餐：只有已用有意义
+            case unlimited
+            /// 有限额度：配额 ÷ 500000 = USD
+            case quota
+        }
+        var kind: Kind
+        var planName: String?
+        var remaining: Double?
+        var total: Double?
+        var used: Double?
+        var unit: String
+    }
+
+    /// 解析 /api/usage/token/ 响应；data 可能在顶层或 data 字段下。
+    static func parseTokenUsage(from data: Data) -> TokenUsage? {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        let payload = (object["data"] as? [String: Any]) ?? object
+        let name = payload["name"] as? String
+
+        if let display = payload["display"] as? [String: Any],
+           let remaining = display["remaining"] as? Double {
+            return TokenUsage(
+                kind: .display,
+                planName: name,
+                remaining: remaining,
+                total: display["total"] as? Double,
+                used: display["used"] as? Double,
+                unit: (display["unit"] as? String) ?? "USD"
+            )
+        }
+        func double(_ key: String) -> Double? {
+            if let d = payload[key] as? Double { return d }
+            if let s = payload[key] as? String { return Double(s) }
+            return nil
+        }
+        if payload["unlimited_quota"] as? Bool == true {
+            return TokenUsage(
+                kind: .unlimited,
+                planName: name,
+                remaining: nil,
+                total: nil,
+                used: double("total_used").map { $0 / 500_000 },
+                unit: "USD"
+            )
+        }
+        if let available = double("total_available"), let used = double("total_used") {
+            return TokenUsage(
+                kind: .quota,
+                planName: name,
+                remaining: available / 500_000,
+                total: double("total_granted").map { $0 / 500_000 },
+                used: used / 500_000,
+                unit: "USD"
+            )
+        }
+        return nil
+    }
+
+    /// 计费端点（兜底用）：沿用版本路径规则（/v1 结尾接 dashboard/billing/…，否则补 /v1）。
     static func billingURL(forBaseURL raw: String, path: String) -> URL? {
         guard let base = normalizeBaseURL(raw),
               var components = URLComponents(url: base, resolvingAgainstBaseURL: false)
@@ -205,8 +285,10 @@ enum APIKeyTester {
         return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
     }
 
-    /// 查询该密钥的余额。优先厂商专用接口（DeepSeek 官方），
-    /// 其余走 one-api 计费约定（subscription + usage 求差）。
+    /// 查询该密钥的余额。优先级：
+    /// 1. 厂商专用接口（DeepSeek 官方）
+    /// 2. new-api 系令牌用量接口 /api/usage/token/（真实额度来源）
+    /// 3. one-api 计费约定（subscription/usage；占位值 1e8 视为不支持）
     static func fetchBalance(key: APIKey, timeout: TimeInterval = 10) async -> BalanceOutcome {
         let dayFormatter = DateFormatter()
         dayFormatter.dateFormat = "yyyy-MM-dd"
@@ -216,7 +298,7 @@ enum APIKeyTester {
         let endDate = dayFormatter.string(from: now.addingTimeInterval(86400))
 
         do {
-            // DeepSeek 官方：独立余额端点，直接返回剩余金额
+            // 1) DeepSeek 官方：独立余额端点，直接返回剩余金额
             if key.vendor == "deepseek" {
                 let url = URL(string: "https://api.deepseek.com/user/balance")!
                 let (data, status) = try await performGET(url: url, apiKey: key.apiKey, timeout: timeout)
@@ -229,45 +311,90 @@ enum APIKeyTester {
                 }
             }
 
-            // one-api 计费约定：总额度 - 已用
-            guard let subURL = billingURL(forBaseURL: key.baseURL, path: "subscription") else {
-                return BalanceOutcome(succeeded: false, total: nil, used: nil, remaining: nil,
-                                      currency: "USD", message: "BaseURL 无效")
-            }
-            let (subData, subStatus) = try await performGET(url: subURL, apiKey: key.apiKey, timeout: timeout)
-            guard (200..<300).contains(subStatus) else {
-                return BalanceOutcome(succeeded: false, total: nil, used: nil, remaining: nil, currency: "USD",
-                                      message: "该供应商不支持余额查询（计费接口 HTTP \(subStatus)）")
-            }
-            guard let total = parseSubscriptionTotal(from: subData) else {
-                return BalanceOutcome(succeeded: false, total: nil, used: nil, remaining: nil, currency: "USD",
-                                      message: "计费接口响应无法解析（非 one-api 格式）")
-            }
-
-            var used: Double?
-            if let usageURL = billingURL(forBaseURL: key.baseURL, path: "usage")?
-                .appending(queryItems: [
-                    URLQueryItem(name: "start_date", value: startDate),
-                    URLQueryItem(name: "end_date", value: endDate),
-                ]),
-               let components = URLComponents(url: usageURL, resolvingAgainstBaseURL: false),
-               let finalURL = components.url {
-                let (usageData, usageStatus) = try await performGET(url: finalURL, apiKey: key.apiKey, timeout: timeout)
-                if (200..<300).contains(usageStatus) {
-                    used = parseUsageCents(from: usageData).map { $0 / 100 }
+            // 2) new-api 令牌用量接口
+            if let tokenURL = tokenUsageURL(forBaseURL: key.baseURL) {
+                let (data, status) = try await performGET(url: tokenURL, apiKey: key.apiKey, timeout: timeout)
+                switch status {
+                case 200..<300:
+                    if let usage = parseTokenUsage(from: data) {
+                        return balanceOutcome(for: usage)
+                    }
+                case 401, 403:
+                    return BalanceOutcome(succeeded: false, total: nil, used: nil, remaining: nil, currency: "USD",
+                                          message: "该密钥无权查询余额（HTTP \(status)）")
+                default:
+                    break // 404 等 → 继续尝试兜底
                 }
             }
 
-            let remaining = total - (used ?? 0)
-            var message = String(format: "剩余 %.2f / 总额度 %.2f USD", remaining, total)
-            if let used {
-                message += String(format: "（已用 %.2f）", used)
+            // 3) one-api 计费约定兜底
+            if let subURL = billingURL(forBaseURL: key.baseURL, path: "subscription") {
+                let (subData, subStatus) = try await performGET(url: subURL, apiKey: key.apiKey, timeout: timeout)
+                if (200..<300).contains(subStatus), let total = parseSubscriptionTotal(from: subData) {
+                    // 部分站点返回 1e8 之类的占位值，不是真实额度
+                    guard total < 1_000_000 else {
+                        return BalanceOutcome(succeeded: false, total: nil, used: nil, remaining: nil, currency: "USD",
+                                              message: "该供应商未开放真实额度查询（计费接口返回占位值）")
+                    }
+                    var used: Double?
+                    if let usageURL = billingURL(forBaseURL: key.baseURL, path: "usage")?
+                        .appending(queryItems: [
+                            URLQueryItem(name: "start_date", value: startDate),
+                            URLQueryItem(name: "end_date", value: endDate),
+                        ]),
+                       let components = URLComponents(url: usageURL, resolvingAgainstBaseURL: false),
+                       let finalURL = components.url {
+                        let (usageData, usageStatus) = try await performGET(url: finalURL, apiKey: key.apiKey, timeout: timeout)
+                        if (200..<300).contains(usageStatus) {
+                            used = parseUsageCents(from: usageData).map { $0 / 100 }
+                        }
+                    }
+                    let remaining = total - (used ?? 0)
+                    var message = String(format: "剩余 %.2f / 总额度 %.2f USD", remaining, total)
+                    if let used {
+                        message += String(format: "（已用 %.2f）", used)
+                    }
+                    return BalanceOutcome(succeeded: true, total: total, used: used,
+                                          remaining: remaining, currency: "USD", message: message)
+                }
             }
-            return BalanceOutcome(succeeded: true, total: total, used: used,
-                                  remaining: remaining, currency: "USD", message: message)
+
+            return BalanceOutcome(succeeded: false, total: nil, used: nil, remaining: nil, currency: "USD",
+                                  message: "该供应商未提供可用的余额查询接口")
         } catch {
             return BalanceOutcome(succeeded: false, total: nil, used: nil, remaining: nil, currency: "USD",
                                   message: "查询失败：\(error.localizedDescription)")
+        }
+    }
+
+    private static func balanceOutcome(for usage: TokenUsage) -> BalanceOutcome {
+        switch usage.kind {
+        case .display:
+            var message = ""
+            if let name = usage.planName { message += "套餐「\(name)」：" }
+            message += String(format: "剩余 %.2f %@", usage.remaining ?? 0, usage.unit)
+            if let total = usage.total {
+                message += String(format: " / 总额度 %.2f", total)
+            }
+            if let used = usage.used {
+                message += String(format: "（已用 %.2f）", used)
+            }
+            return BalanceOutcome(succeeded: true, total: usage.total, used: usage.used,
+                                  remaining: usage.remaining, currency: usage.unit, message: message)
+        case .unlimited:
+            var message = "不限量套餐"
+            if let name = usage.planName { message = "套餐「\(name)」（不限量）" }
+            if let used = usage.used {
+                message += String(format: "：已用 %.2f USD", used)
+            }
+            return BalanceOutcome(succeeded: true, total: nil, used: usage.used,
+                                  remaining: nil, currency: "USD", message: message)
+        case .quota:
+            var message = String(format: "剩余 %.2f / 总额度 %.2f USD（已用 %.2f）",
+                                 usage.remaining ?? 0, usage.total ?? 0, usage.used ?? 0)
+            if let name = usage.planName { message = "套餐「\(name)」" + message }
+            return BalanceOutcome(succeeded: true, total: usage.total, used: usage.used,
+                                  remaining: usage.remaining, currency: "USD", message: message)
         }
     }
 

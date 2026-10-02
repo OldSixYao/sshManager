@@ -442,7 +442,7 @@ struct APIKeyDetailView: View {
                             .textSelection(.enabled)
                     }
                 } else {
-                    Text("余额查询支持 one-api 系中转站（subscription/usage 计费接口）与 DeepSeek 官方；其余供应商若未实现标准计费接口会明确提示。")
+                    Text("余额查询支持 new-api 系中转站（令牌用量接口）与 DeepSeek 官方；deepkey 的 home 套餐为不限量，仅显示已用。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

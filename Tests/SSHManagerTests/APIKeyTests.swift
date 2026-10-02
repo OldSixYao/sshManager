@@ -134,6 +134,44 @@ struct APIKeyTests {
         #expect(CCSwitchExporter.appType(for: geminiKey) == "gemini")
     }
 
+    @Test func tokenUsageParsing() {
+        // 站点根提取：去掉 /v1 等版本段
+        #expect(
+            APIKeyTester.tokenUsageURL(forBaseURL: "https://api.shuaiapi.com/v1")?.absoluteString
+                == "https://api.shuaiapi.com/api/usage/token/"
+        )
+        #expect(
+            APIKeyTester.tokenUsageURL(forBaseURL: "https://deepkey.top")?.absoluteString
+                == "https://deepkey.top/api/usage/token/"
+        )
+
+        // display 形态（new-api 直接给金额与单位）
+        let display = Data(#"{"data":{"name":"codex","unlimited_quota":true,"display":{"remaining":9.9,"total":371.9,"used":362.0,"unit":"CNY"}}}"#.utf8)
+        let d = APIKeyTester.parseTokenUsage(from: display)
+        #expect(d?.kind == .display)
+        #expect(d?.planName == "codex")
+        #expect(d?.remaining == 9.9)
+        #expect(d?.unit == "CNY")
+
+        // 不限量形态：只有已用
+        let unlimited = Data(#"{"data":{"name":"home","unlimited_quota":true,"total_used":2500000}}"#.utf8)
+        let u = APIKeyTester.parseTokenUsage(from: unlimited)
+        #expect(u?.kind == .unlimited)
+        #expect(u?.planName == "home")
+        #expect(u?.used == 5.0, "2500000 / 500000 = 5 USD")
+
+        // 有限额度形态：配额 ÷ 500000
+        let quota = Data(#"{"data":{"name":"std","total_granted":100000000,"total_used":1250000,"total_available":49875000}}"#.utf8)
+        let q = APIKeyTester.parseTokenUsage(from: quota)
+        #expect(q?.kind == .quota)
+        #expect(q?.total == 200.0)
+        #expect(q?.used == 2.5)
+        #expect(q?.remaining == 99.75)
+
+        // data 在顶层的兼容 + 解析失败
+        #expect(APIKeyTester.parseTokenUsage(from: Data("garbage".utf8)) == nil)
+    }
+
     @Test func billingURLAndParsing() {
         // 计费端点沿用版本路径规则
         #expect(
