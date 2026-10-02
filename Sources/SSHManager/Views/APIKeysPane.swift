@@ -215,6 +215,8 @@ struct APIKeyDetailView: View {
     @State private var hideKey = false
     @State private var testOutcome: APIKeyTester.TestOutcome?
     @State private var isTesting = false
+    @State private var balanceOutcome: APIKeyTester.BalanceOutcome?
+    @State private var isFetchingBalance = false
 
     var body: some View {
         ScrollView {
@@ -288,6 +290,20 @@ struct APIKeyDetailView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(isTesting)
+
+            Button {
+                fetchBalance()
+            } label: {
+                if isFetchingBalance {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        Text("查询中…")
+                    }
+                } else {
+                    Label("查询余额", systemImage: "creditcard")
+                }
+            }
+            .disabled(isFetchingBalance)
 
             Button {
                 copyToPasteboard(APIKeyTester.curlExample(for: key))
@@ -400,7 +416,7 @@ struct APIKeyDetailView: View {
     }
 
     private var testSection: some View {
-        section("连通性") {
+        section("连通性与余额") {
             VStack(alignment: .leading, spacing: 8) {
                 if let outcome = testOutcome {
                     HStack(spacing: 8) {
@@ -412,6 +428,21 @@ struct APIKeyDetailView: View {
                     }
                 } else {
                     Text("测试会请求 \(key.baseURL) 的模型列表接口，验证密钥是否有效。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Divider()
+                if let balance = balanceOutcome {
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(balance.succeeded ? Color.green : Color.secondary.opacity(0.6))
+                            .frame(width: 9, height: 9)
+                        Text(balance.message)
+                            .foregroundStyle(balance.succeeded ? Color.primary : Color.secondary)
+                            .textSelection(.enabled)
+                    }
+                } else {
+                    Text("余额查询支持 one-api 系中转站（subscription/usage 计费接口）与 DeepSeek 官方；其余供应商若未实现标准计费接口会明确提示。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -435,6 +466,19 @@ struct APIKeyDetailView: View {
             await MainActor.run {
                 testOutcome = outcome
                 isTesting = false
+            }
+        }
+    }
+
+    /// 查询该密钥供应商下的余额
+    private func fetchBalance() {
+        isFetchingBalance = true
+        let target = key
+        Task.detached {
+            let outcome = await APIKeyTester.fetchBalance(key: target)
+            await MainActor.run {
+                balanceOutcome = outcome
+                isFetchingBalance = false
             }
         }
     }

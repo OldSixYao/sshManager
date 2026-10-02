@@ -134,6 +134,34 @@ struct APIKeyTests {
         #expect(CCSwitchExporter.appType(for: geminiKey) == "gemini")
     }
 
+    @Test func billingURLAndParsing() {
+        // 计费端点沿用版本路径规则
+        #expect(
+            APIKeyTester.billingURL(forBaseURL: "https://deepkey.top/v1", path: "subscription")?.absoluteString
+                == "https://deepkey.top/v1/dashboard/billing/subscription"
+        )
+        #expect(
+            APIKeyTester.billingURL(forBaseURL: "https://api.example.com", path: "usage")?.absoluteString
+                == "https://api.example.com/v1/dashboard/billing/usage"
+        )
+
+        // one-api subscription / usage 解析
+        let subscription = Data(#"{"object":"billing_subscription","hard_limit_usd":100.5}"#.utf8)
+        #expect(APIKeyTester.parseSubscriptionTotal(from: subscription) == 100.5)
+        let usage = Data(#"{"object":"list","total_usage":1234}"#.utf8)
+        #expect(APIKeyTester.parseUsageCents(from: usage) == 1234)
+
+        // DeepSeek 官方余额解析
+        let deepseek = Data(#"{"is_available":true,"balance_infos":[{"currency":"CNY","total_balance":"110.00"}]}"#.utf8)
+        let parsed = APIKeyTester.parseDeepSeekBalance(from: deepseek)
+        #expect(parsed?.remaining == 110.0)
+        #expect(parsed?.currency == "CNY")
+
+        // 解析失败路径
+        #expect(APIKeyTester.parseSubscriptionTotal(from: Data("{}".utf8)) == nil)
+        #expect(APIKeyTester.parseDeepSeekBalance(from: Data("{}".utf8)) == nil)
+    }
+
     @Test func curlExample() {
         let key = APIKey(name: "t", baseURL: "https://api.example.com/v1", apiKey: "sk-secret")
         #expect(
